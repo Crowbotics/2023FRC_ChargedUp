@@ -4,22 +4,28 @@
 
 package frc.robot.subsystems;
 
+import com.ctre.phoenix.sensors.CANCoder;
+import com.revrobotics.CANSparkMax;
+import com.revrobotics.RelativeEncoder;
+import com.revrobotics.CANSparkMaxLowLevel.MotorType;
+
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
-import edu.wpi.first.wpilibj.Encoder;
 import frc.robot.Constants.ModuleConstants;
-import edu.wpi.first.wpilibj.motorcontrol.Spark;
 
 public class SwerveModule {
-  private final Spark m_driveMotor;
-  private final Spark m_turningMotor;
+  private final CANSparkMax m_driveMotor;
+  private final CANSparkMax m_turningMotor;
 
-  private final Encoder m_driveEncoder;
-  private final Encoder m_turningEncoder;
+  private final RelativeEncoder m_driveEncoder;
+  private final RelativeEncoder m_turningEncoder;
+  private final CANCoder m_canCoder;
+
+  SwerveModuleState m_desiredState;
 
   private final PIDController m_drivePIDController =
       new PIDController(ModuleConstants.kPModuleDriveController, 0, 0);
@@ -47,36 +53,48 @@ public class SwerveModule {
   public SwerveModule(
       int driveMotorChannel,
       int turningMotorChannel,
-      int[] driveEncoderChannels,
-      int[] turningEncoderChannels,
+      int canCoderChannel,
       boolean driveEncoderReversed,
       boolean turningEncoderReversed) {
-    m_driveMotor = new Spark(driveMotorChannel);
-    m_turningMotor = new Spark(turningMotorChannel);
+    m_canCoder = new CANCoder(canCoderChannel);
+        
+    m_driveMotor = new CANSparkMax(driveMotorChannel, MotorType.kBrushless);
+    
+    m_turningMotor = new CANSparkMax(turningMotorChannel, MotorType.kBrushless);
 
-    m_driveEncoder = new Encoder(driveEncoderChannels[0], driveEncoderChannels[1]);
+    m_turningMotor.setInverted(true);
+    
+    m_driveEncoder = m_driveMotor.getEncoder();
 
-    m_turningEncoder = new Encoder(turningEncoderChannels[0], turningEncoderChannels[1]);
-
+    //m_turningEncoder = new Encoder(turningEncoderChannels[0], turningEncoderChannels[1]);
+    m_turningEncoder = m_turningMotor.getEncoder();
     // Set the distance per pulse for the drive encoder. We can simply use the
     // distance traveled for one rotation of the wheel divided by the encoder
     // resolution.
-    m_driveEncoder.setDistancePerPulse(ModuleConstants.kDriveEncoderDistancePerPulse);
-
+    //m_driveEncoder.setDistancePerPulse(ModuleConstants.kDriveEncoderDistancePerPulse);
     // Set whether drive encoder should be reversed or not
-    m_driveEncoder.setReverseDirection(driveEncoderReversed);
+    //m_driveEncoder.setReverseDirection(driveEncoderReversed);
+
+    m_driveEncoder.setPositionConversionFactor(ModuleConstants.kDriveEncoderDistancePerPulse);
+    m_driveEncoder.setVelocityConversionFactor(ModuleConstants.kDriveEncoderDistancePerPulse/60);
 
     // Set the distance (in this case, angle) in radians per pulse for the turning encoder.
     // This is the the angle through an entire rotation (2 * pi) divided by the
     // encoder resolution.
-    m_turningEncoder.setDistancePerPulse(ModuleConstants.kTurningEncoderDistancePerPulse);
+    m_turningEncoder.setPositionConversionFactor(ModuleConstants.kTurningEncoderDistancePerPulse);
+    m_turningEncoder.setVelocityConversionFactor(ModuleConstants.kTurningEncoderDistancePerPulse/60);
+
+    
 
     // Set whether turning encoder should be reversed or not
-    m_turningEncoder.setReverseDirection(turningEncoderReversed);
+    //m_turningEncoder.setReverseDirection(turningEncoderReversed);
 
     // Limit the PID Controller's input range between -pi and pi and set the input
     // to be continuous.
+    //m_turningPIDController.enableContinuousInput(-Math.PI, Math.PI);
     m_turningPIDController.enableContinuousInput(-Math.PI, Math.PI);
+
+    m_desiredState = new SwerveModuleState();
   }
 
   /**
@@ -86,7 +104,7 @@ public class SwerveModule {
    */
   public SwerveModuleState getState() {
     return new SwerveModuleState(
-        m_driveEncoder.getRate(), new Rotation2d(m_turningEncoder.getDistance()));
+        m_driveEncoder.getVelocity(), new Rotation2d(getRads()));
   }
 
   /**
@@ -96,7 +114,7 @@ public class SwerveModule {
    */
   public SwerveModulePosition getPosition() {
     return new SwerveModulePosition(
-        m_driveEncoder.getDistance(), new Rotation2d(m_turningEncoder.getDistance()));
+        m_driveEncoder.getPosition(), new Rotation2d(getRads()));
   }
 
   /**
@@ -106,16 +124,18 @@ public class SwerveModule {
    */
   public void setDesiredState(SwerveModuleState desiredState) {
     // Optimize the reference state to avoid spinning further than 90 degrees
-    SwerveModuleState state =
-        SwerveModuleState.optimize(desiredState, new Rotation2d(m_turningEncoder.getDistance()));
+    SwerveModuleState state = desiredState;
+      
+      //  SwerveModuleState.optimize(m_desiredState, new Rotation2d(getRads()));
+
 
     // Calculate the drive output from the drive PID controller.
     final double driveOutput =
-        m_drivePIDController.calculate(m_driveEncoder.getRate(), state.speedMetersPerSecond);
+        m_drivePIDController.calculate(m_driveEncoder.getVelocity(), state.speedMetersPerSecond);
 
     // Calculate the turning motor output from the turning PID controller.
     final double turnOutput =
-        m_turningPIDController.calculate(m_turningEncoder.getDistance(), state.angle.getRadians());
+        m_turningPIDController.calculate(getRads(), state.angle.getRadians());
 
     // Calculate the turning motor output from the turning PID controller.
     m_driveMotor.set(driveOutput);
@@ -124,7 +144,74 @@ public class SwerveModule {
 
   /** Zeroes all the SwerveModule encoders. */
   public void resetEncoders() {
-    m_driveEncoder.reset();
-    m_turningEncoder.reset();
+    m_driveEncoder.setPosition(0);
   }
+
+  public double getDegrees()
+  {
+    return m_canCoder.getAbsolutePosition();
+  }
+
+  public double getRads()
+  {
+    return m_canCoder.getAbsolutePosition() / 360.0 * 2*Math.PI;
+  }
+
+      /**
+     * Find the reverse of a given angle (i.e. pi/4->7pi/4)
+     * @param radians the angle in radians to reverse
+     * @return the reversed angle
+     */
+    private double findRevAngle(double radians) {
+      return (Math.PI * 2 + radians) % (2 * Math.PI) - Math.PI;
+  }
+
+  /**
+   * Finds the distance in ticks between two setpoints
+   * @param setpoint initial/current point
+   * @param position desired position
+   * @return the distance between the two point
+   */
+  private double getDistance(double setpoint, double position) {
+      return Math.abs(setpoint - position);
+  }
+  
+    /**
+     * Optimize the swerve module state by setting it to the closest equivalent vector
+     * @param original the original swerve module state
+     * @return the optimized swerve module state
+     */
+    private SwerveModuleState optimizeState(SwerveModuleState original) {
+      // Compute all options for a setpoint
+      double position = getRads();
+      double setpoint = original.angle.getRadians();
+      double forward = setpoint + (2 * Math.PI);
+      double reverse = setpoint - (2 * Math.PI);
+      double antisetpoint = findRevAngle(setpoint);
+      double antiforward = antisetpoint + (2 * Math.PI);
+      double antireverse = antisetpoint - (2 * Math.PI);
+
+      // Find setpoint option with minimum distance
+      double[] alternatives = { forward, reverse, antisetpoint, antiforward, antireverse };
+      double min = setpoint;
+      double minDistance = getDistance(setpoint, position);
+      int minIndex = -1;
+      for (int i = 0; i < alternatives.length; i++) {
+          double dist = getDistance(alternatives[i], position);
+          if (dist < minDistance) {
+              min = alternatives[i];
+              minDistance = dist;
+              minIndex = i;
+          }
+      }
+
+      // Figure out the speed. Anti- directions should be negative.
+      double speed = original.speedMetersPerSecond;
+      if (minIndex > 1) {
+          speed *= -1;
+      }
+
+      return new SwerveModuleState(speed, new Rotation2d(min));
+  }
+
 }

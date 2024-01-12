@@ -4,16 +4,24 @@
 
 package frc.robot.subsystems;
 
+import org.w3c.dom.html.HTMLHeadingElement;
+
+import com.kauailabs.navx.frc.AHRS;
+
+import edu.wpi.first.cameraserver.CameraServer;
+import edu.wpi.first.cscore.HttpCamera;
+import edu.wpi.first.cscore.HttpCamera.HttpCameraKind;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
-import edu.wpi.first.wpilibj.ADXRS450_Gyro;
 import frc.robot.Constants.DriveConstants;
-import edu.wpi.first.wpilibj.interfaces.Gyro;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import edu.wpi.first.wpilibj.SPI;
+import edu.wpi.first.wpilibj.motorcontrol.Spark;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 public class DriveSubsystem extends SubsystemBase {
   // Robot swerve modules
@@ -21,8 +29,7 @@ public class DriveSubsystem extends SubsystemBase {
       new SwerveModule(
           DriveConstants.kFrontLeftDriveMotorPort,
           DriveConstants.kFrontLeftTurningMotorPort,
-          DriveConstants.kFrontLeftDriveEncoderPorts,
-          DriveConstants.kFrontLeftTurningEncoderPorts,
+          DriveConstants.kFrontLeftCanCoderChannel,
           DriveConstants.kFrontLeftDriveEncoderReversed,
           DriveConstants.kFrontLeftTurningEncoderReversed);
 
@@ -30,8 +37,7 @@ public class DriveSubsystem extends SubsystemBase {
       new SwerveModule(
           DriveConstants.kRearLeftDriveMotorPort,
           DriveConstants.kRearLeftTurningMotorPort,
-          DriveConstants.kRearLeftDriveEncoderPorts,
-          DriveConstants.kRearLeftTurningEncoderPorts,
+          DriveConstants.kRearLeftCanCoderChannel,
           DriveConstants.kRearLeftDriveEncoderReversed,
           DriveConstants.kRearLeftTurningEncoderReversed);
 
@@ -39,8 +45,7 @@ public class DriveSubsystem extends SubsystemBase {
       new SwerveModule(
           DriveConstants.kFrontRightDriveMotorPort,
           DriveConstants.kFrontRightTurningMotorPort,
-          DriveConstants.kFrontRightDriveEncoderPorts,
-          DriveConstants.kFrontRightTurningEncoderPorts,
+          DriveConstants.kFrontRightCanCoderChannel,
           DriveConstants.kFrontRightDriveEncoderReversed,
           DriveConstants.kFrontRightTurningEncoderReversed);
 
@@ -48,19 +53,22 @@ public class DriveSubsystem extends SubsystemBase {
       new SwerveModule(
           DriveConstants.kRearRightDriveMotorPort,
           DriveConstants.kRearRightTurningMotorPort,
-          DriveConstants.kRearRightDriveEncoderPorts,
-          DriveConstants.kRearRightTurningEncoderPorts,
+          DriveConstants.kRearRightCanCoderChannel,
           DriveConstants.kRearRightDriveEncoderReversed,
           DriveConstants.kRearRightTurningEncoderReversed);
 
-  // The gyro sensor
-  private final Gyro m_gyro = new ADXRS450_Gyro();
+  public double speedMultiplier = 10.0;
+  
+  // The gyro sensor/
+  private final AHRS m_ahrs = new AHRS(SPI.Port.kMXP);
+  private final Spark blinkin = new Spark(9);
+
 
   // Odometry class for tracking robot pose
   SwerveDriveOdometry m_odometry =
       new SwerveDriveOdometry(
           DriveConstants.kDriveKinematics,
-          m_gyro.getRotation2d(),
+          m_ahrs.getRotation2d(),
           new SwerveModulePosition[] {
             m_frontLeft.getPosition(),
             m_frontRight.getPosition(),
@@ -68,21 +76,39 @@ public class DriveSubsystem extends SubsystemBase {
             m_rearRight.getPosition()
           });
 
+  HttpCamera limelightFeed = new HttpCamera("limelight", "http://10.3.22.11:5800/stream.mjpg", HttpCameraKind.kMJPGStreamer);
+
   /** Creates a new DriveSubsystem. */
-  public DriveSubsystem() {}
+  public DriveSubsystem() {
+    CameraServer.startAutomaticCapture(limelightFeed);
+
+  }
 
   @Override
   public void periodic() {
     // Update the odometry in the periodic block
     m_odometry.update(
-        m_gyro.getRotation2d(),
+        m_ahrs.getRotation2d(),
         new SwerveModulePosition[] {
           m_frontLeft.getPosition(),
           m_frontRight.getPosition(),
           m_rearLeft.getPosition(),
           m_rearRight.getPosition()
         });
-  }
+
+        SmartDashboard.putNumber("FL T Cancoder", m_frontLeft.getDegrees());
+        SmartDashboard.putNumber("RL T Cancoder", m_rearLeft.getDegrees());
+        SmartDashboard.putNumber("FR T Cancoder", m_frontRight.getDegrees());
+        SmartDashboard.putNumber("RR T Cancoder", m_rearRight.getDegrees());
+
+        //SmartDashboard.putNumber("Meters Per Second: ", m_frontLeft.getState().speedMetersPerSecond);
+
+        //SmartDashboard.putNumber("FL Desired Angle: ", m_frontLeft.m_desiredState.angle.getDegrees());
+        //SmartDashboard.putNumber("FL Desired Speed: ", m_frontLeft.m_desiredState.speedMetersPerSecond);
+
+        SmartDashboard.putNumber("Heading: ", getHeading());
+
+      }
 
   /**
    * Returns the currently-estimated pose of the robot.
@@ -100,7 +126,7 @@ public class DriveSubsystem extends SubsystemBase {
    */
   public void resetOdometry(Pose2d pose) {
     m_odometry.resetPosition(
-        m_gyro.getRotation2d(),
+        m_ahrs.getRotation2d(),
         new SwerveModulePosition[] {
           m_frontLeft.getPosition(),
           m_frontRight.getPosition(),
@@ -118,11 +144,28 @@ public class DriveSubsystem extends SubsystemBase {
    * @param rot Angular rate of the robot.
    * @param fieldRelative Whether the provided x and y speeds are relative to the field.
    */
-  public void drive(double xSpeed, double ySpeed, double rot, boolean fieldRelative) {
+  public void drive(double xSpeed, double ySpeed, double rot, boolean fieldRelative, double multi) {
+    speedMultiplier = multi;
+    
+    if(Math.abs(xSpeed) <= .10)
+      xSpeed = 0.0;
+    else
+      xSpeed = speedMultiplier * xSpeed;
+
+    if(Math.abs(ySpeed) <= .10)
+      ySpeed = 0.0;
+    else
+      ySpeed = speedMultiplier * ySpeed;
+
+    if(Math.abs(rot) <= .10)
+      rot = 0.0;     
+    else
+      rot = 10.0 * rot; 
+
     var swerveModuleStates =
         DriveConstants.kDriveKinematics.toSwerveModuleStates(
             fieldRelative
-                ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, m_gyro.getRotation2d())
+                ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, m_ahrs.getRotation2d())
                 : new ChassisSpeeds(xSpeed, ySpeed, rot));
     SwerveDriveKinematics.desaturateWheelSpeeds(
         swerveModuleStates, DriveConstants.kMaxSpeedMetersPerSecond);
@@ -130,7 +173,10 @@ public class DriveSubsystem extends SubsystemBase {
     m_frontRight.setDesiredState(swerveModuleStates[1]);
     m_rearLeft.setDesiredState(swerveModuleStates[2]);
     m_rearRight.setDesiredState(swerveModuleStates[3]);
+  
   }
+
+  
 
   /**
    * Sets the swerve ModuleStates.
@@ -156,7 +202,12 @@ public class DriveSubsystem extends SubsystemBase {
 
   /** Zeroes the heading of the robot. */
   public void zeroHeading() {
-    m_gyro.reset();
+    m_ahrs.reset();
+  }
+
+  public void changeColor(double color)
+  {
+    blinkin.set(color);
   }
 
   /**
@@ -165,7 +216,12 @@ public class DriveSubsystem extends SubsystemBase {
    * @return the robot's heading in degrees, from -180 to 180
    */
   public double getHeading() {
-    return m_gyro.getRotation2d().getDegrees();
+    return m_ahrs.getAngle() % 360.0;
+  }
+
+  public void changeSpeedMultiplier(double multi)
+  {
+    speedMultiplier = multi;
   }
 
   /**
@@ -174,6 +230,6 @@ public class DriveSubsystem extends SubsystemBase {
    * @return The turn rate of the robot, in degrees per second
    */
   public double getTurnRate() {
-    return m_gyro.getRate() * (DriveConstants.kGyroReversed ? -1.0 : 1.0);
+    return m_ahrs.getRate() * (DriveConstants.kGyroReversed ? -1.0 : 1.0);
   }
 }

@@ -28,29 +28,38 @@ public final class Constants {
     public static final int kFrontRightTurningMotorPort = 6;
     public static final int kRearRightTurningMotorPort = 8;
 
+    public static final int kFrontLeftCanCoderChannel = 22;
+    public static final int kRearLeftCanCoderChannel = 24;
+    public static final int kFrontRightCanCoderChannel = 26;
+    public static final int kRearRightCanCoderChannel = 28;
+
+    /**
     public static final int[] kFrontLeftTurningEncoderPorts = new int[] {0, 1};
     public static final int[] kRearLeftTurningEncoderPorts = new int[] {2, 3};
     public static final int[] kFrontRightTurningEncoderPorts = new int[] {4, 5};
     public static final int[] kRearRightTurningEncoderPorts = new int[] {6, 7};
+    */
 
     public static final boolean kFrontLeftTurningEncoderReversed = false;
     public static final boolean kRearLeftTurningEncoderReversed = true;
     public static final boolean kFrontRightTurningEncoderReversed = false;
     public static final boolean kRearRightTurningEncoderReversed = true;
 
+    /**
     public static final int[] kFrontLeftDriveEncoderPorts = new int[] {8, 9};
     public static final int[] kRearLeftDriveEncoderPorts = new int[] {10, 11};
     public static final int[] kFrontRightDriveEncoderPorts = new int[] {12, 13};
     public static final int[] kRearRightDriveEncoderPorts = new int[] {14, 15};
+    */
 
     public static final boolean kFrontLeftDriveEncoderReversed = false;
     public static final boolean kRearLeftDriveEncoderReversed = true;
     public static final boolean kFrontRightDriveEncoderReversed = false;
     public static final boolean kRearRightDriveEncoderReversed = true;
 
-    public static final double kTrackWidth = 0.5;
+    public static final double kTrackWidth = 0.394;
     // Distance between centers of right and left wheels on robot
-    public static final double kWheelBase = 0.7;
+    public static final double kWheelBase = 0.394;
     // Distance between front and back wheels on robot
     public static final SwerveDriveKinematics kDriveKinematics =
         new SwerveDriveKinematics(
@@ -65,49 +74,76 @@ public final class Constants {
     // These characterization values MUST be determined either experimentally or theoretically
     // for *your* robot's drive.
     // The SysId tool provides a convenient method for obtaining these values for your robot.
-    public static final double ksVolts = 1;
-    public static final double kvVoltSecondsPerMeter = 0.8;
-    public static final double kaVoltSecondsSquaredPerMeter = 0.15;
+    //public static final double ksVolts = 1;
+    //public static final double kvVoltSecondsPerMeter = 0.8;
+    //public static final double kaVoltSecondsSquaredPerMeter = 0.15;
 
-    public static final double kMaxSpeedMetersPerSecond = 3;
+    public static final double kMaxSpeedMetersPerSecond = 15 * 4096;
+
+    public static final double kFrontLeftOffset = 0;
+    public static final double kFrontRightOffset = 0;
+    public static final double kRearLeftOffset = 0;
+    public static final double kRearRightOffset = 0;
   }
 
   public static final class ModuleConstants {
-    public static final double kMaxModuleAngularSpeedRadiansPerSecond = 2 * Math.PI;
-    public static final double kMaxModuleAngularAccelerationRadiansPerSecondSquared = 2 * Math.PI;
+    public static final double kMaxModuleAngularSpeedRadiansPerSecond = 8 * Math.PI * 4096;
+    public static final double kMaxModuleAngularAccelerationRadiansPerSecondSquared = 4 * Math.PI * 4096;
 
-    public static final int kEncoderCPR = 1024;
-    public static final double kWheelDiameterMeters = 0.15;
+    public static final int kEncoderCPR = 4096; //Changed from 1024
+    public static final double kWheelDiameterMeters = 0.102;
     public static final double kDriveEncoderDistancePerPulse =
         // Assumes the encoders are directly mounted on the wheel shafts
-        (kWheelDiameterMeters * Math.PI) / (double) kEncoderCPR;
+        //(kWheelDiameterMeters * Math.PI) / (double) kEncoderCPR
+         .1403 * Math.PI * kWheelDiameterMeters / 4096.0;
 
     public static final double kTurningEncoderDistancePerPulse =
         // Assumes the encoders are on a 1:1 reduction with the module shaft.
         (2 * Math.PI) / (double) kEncoderCPR;
 
-    public static final double kPModuleTurningController = 1;
+    public static final double kPModuleTurningController = 0.3;
 
-    public static final double kPModuleDriveController = 1;
+    public static final double kPModuleDriveController = 0.1;
+  }
+
+  public static final class ArmConstants{
+    public static final int kArmCANID = 9;
+    public static final int kIntakeMidCANID = 10;
+    public static final int kIntakeEndCANID = 11;
+
+    public static final double kMoveArmSpeed = 0.30;
+
+    public static final double kIntakeConeSpeed = -1.00;
+    public static final double kScoreConeSpeed = 1.00;
+    public static final double kIntakeCubeSpeed = 1.00;
+    public static final double kScoreCubeSpeed = -1.00;
+    
   }
 
   public static final class OIConstants {
     public static final int kDriverControllerPort = 0;
+    public static final int kAuxControllerPort = 1;
   }
 
   public static final class AutoConstants {
-    public static final double kMaxSpeedMetersPerSecond = 3;
+    public static final double kMaxSpeedMetersPerSecond = 6;
     public static final double kMaxAccelerationMetersPerSecondSquared = 3;
-    public static final double kMaxAngularSpeedRadiansPerSecond = Math.PI;
-    public static final double kMaxAngularSpeedRadiansPerSecondSquared = Math.PI;
+    public static final double kMaxAngularSpeedRadiansPerSecond = 4*Math.PI;
+    public static final double kMaxAngularSpeedRadiansPerSecondSquared = 2*Math.PI;
 
-    public static final double kPXController = 1;
-    public static final double kPYController = 1;
-    public static final double kPThetaController = 1;
+    public static final double kPXController = 0.5;
+    public static final double kPYController = 0.5;
+    public static final double kPThetaController = 0.5;
 
     // Constraint for the motion profiled robot angle controller
     public static final TrapezoidProfile.Constraints kThetaControllerConstraints =
         new TrapezoidProfile.Constraints(
             kMaxAngularSpeedRadiansPerSecond, kMaxAngularSpeedRadiansPerSecondSquared);
+  }
+
+  public static final class LEDConstants{
+    public static final double kOrange = 0.0;
+    public static final double kYellow = 0.91;
+    public static final double kPurple = 0.69;
   }
 }
